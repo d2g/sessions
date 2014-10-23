@@ -66,6 +66,8 @@ func (t *SessionInfo) SetSessionCookie(response http.ResponseWriter, s Session) 
 
 	if t.Cookie.Path != "" {
 		cookie.Path = t.Cookie.Path
+	} else {
+		cookie.Path = "/"
 	}
 
 	if t.Cookie.Domain != "" {
@@ -167,7 +169,8 @@ func (t *SessionInfo) SaveSession(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			//Tell the client to update it's cookie.
+			//Save the session
+			//This is needed when start the session for the first time.
 			err = t.SetSessionCookie(w, cache.Session)
 			if err != nil {
 				http.Error(w, err.Error(), 500)
@@ -183,6 +186,19 @@ type sessionInfoHandler struct {
 }
 
 func (t sessionInfoHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	//Cookies have to be updated before we write back to the client.
+	//This means this requests is the update from the last session.
+	session, err := t.GetSession(r)
+	if err == nil {
+		//Tell the client to update it's cookie.
+		err = t.SetSessionCookie(w, session)
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+	}
+
+	//Call the inner servehttp.
 	t.Handler.ServeHTTP(w, r)
 
 	//Save the session

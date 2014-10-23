@@ -87,6 +87,15 @@ func (t *defaultSession) GobEncode() ([]byte, error) {
 		t.values,
 	}
 
+	//If the ID hasn't be encoded
+	if encoded.ID == "" {
+		var err error
+		encoded.ID, err = t.ID()
+		if err != nil {
+			return []byte{}, err
+		}
+	}
+
 	buf := new(bytes.Buffer)
 	enc := gob.NewEncoder(buf)
 	if err := enc.Encode(encoded); err != nil {

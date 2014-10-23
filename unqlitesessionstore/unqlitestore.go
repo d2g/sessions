@@ -1,8 +1,9 @@
-package sessions
+package unqlitesessionstore
 
 import (
 	"bytes"
 	"encoding/gob"
+	"github.com/d2g/sessions"
 	"github.com/d2g/unqlitego"
 	"log"
 )
@@ -11,7 +12,7 @@ type unqliteStore struct {
 	collection *unqlitego.Database
 }
 
-func NewUnqliteStore(filename string) (*unqliteStore, error) {
+func New(filename string) (*unqliteStore, error) {
 	store := new(unqliteStore)
 
 	var err error
@@ -23,10 +24,10 @@ func NewUnqliteStore(filename string) (*unqliteStore, error) {
 	return store, nil
 }
 
-func (t *unqliteStore) Get(id string) (Session, error) {
+func (t *unqliteStore) Get(id string) (sessions.Session, error) {
 	var err error
 
-	s, err := NewDefaultSession()
+	s, err := sessions.NewDefaultSession()
 	if err != nil {
 		return s, err
 	}
@@ -52,7 +53,7 @@ func (t *unqliteStore) Get(id string) (Session, error) {
 	return s, err
 }
 
-func (t *unqliteStore) Set(s Session) error {
+func (t *unqliteStore) Set(s sessions.Session) error {
 	sessionid, err := s.ID()
 	if err != nil {
 		return err
@@ -77,30 +78,30 @@ func (t *unqliteStore) Delete(id string) error {
 	err := t.collection.DeleteObject(id)
 
 	if err != nil {
-		log.Println("Error Deleting Session from Datastore")
+		log.Println("Error: Deleting Session from Datastore")
 	}
 
 	return err
 }
 
-func (t *unqliteStore) All() ([]Session, error) {
+func (t *unqliteStore) All() ([]sessions.Session, error) {
 
-	sessions := make([]Session, 0, 0)
+	s := make([]sessions.Session, 0, 0)
 
 	cursor, err := t.collection.NewCursor()
 	defer cursor.Close()
 
 	if err != nil {
-		return sessions, err
+		return s, err
 	}
 
 	err = cursor.First()
 	if err != nil {
 		//You Get -28 When There are no records.
 		if err == unqlitego.UnQLiteError(-28) {
-			return sessions, nil
+			return s, nil
 		} else {
-			return sessions, err
+			return s, err
 		}
 	}
 
@@ -109,9 +110,9 @@ func (t *unqliteStore) All() ([]Session, error) {
 			break
 		}
 
-		session, err := NewDefaultSession()
+		session, err := sessions.NewDefaultSession()
 		if err != nil {
-			return sessions, err
+			return s, err
 		}
 
 		value, err := cursor.Value()
@@ -119,21 +120,22 @@ func (t *unqliteStore) All() ([]Session, error) {
 		if err != nil {
 			log.Println("Error: Cursor Get Value Error:" + err.Error())
 		} else {
-			err := t.collection.Unmarshal()(value, &session)
-			if err != nil {
+
+			dec := gob.NewDecoder(bytes.NewBuffer(value))
+			if err := dec.Decode(&session); err != nil {
 				key, err := cursor.Key()
 				if err != nil {
 					log.Println("Error: Cursor Get Key Error:" + err.Error())
 					cursor.Delete()
 					continue
 				} else {
-					log.Println("Invalid Session in Datastore:" + string(key))
+					log.Println("Error: Invalid Session in Datastore:" + string(key))
 					cursor.Delete()
 					continue
 				}
 			}
 
-			sessions = append(sessions, session)
+			s = append(s, session)
 		}
 
 		err = cursor.Next()
@@ -146,5 +148,5 @@ func (t *unqliteStore) All() ([]Session, error) {
 	if err != nil {
 		log.Println("Error Closing Sursor:" + err.Error())
 	}
-	return sessions, err
+	return s, err
 }
