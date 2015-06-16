@@ -1,6 +1,7 @@
 package sessions
 
 import (
+	"log"
 	"net/http"
 	"time"
 )
@@ -41,11 +42,13 @@ func (t *SessionInfo) GetSession(request *http.Request) (Session, error) {
 
 	sessionid, err := t.GetSessionID(request)
 	if err != nil {
+		log.Printf("Debug: Error Getting Session ID For Request: %s\n", err.Error())
 		return nil, err
 	}
 
 	session, err := t.Store.Get(sessionid)
 	if err != nil {
+		log.Printf("Debug: Error Session For Session ID \"%s\" because: %s\n", sessionid, err.Error())
 		return nil, err
 	}
 
